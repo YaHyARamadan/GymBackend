@@ -45,6 +45,10 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
         if (supervisor == null)
             throw new NotFoundException("حساب السوبرفايزر غير موجود.");
 
+        // Lockout check
+        if (supervisor.TotpLockoutUntil.HasValue && supervisor.TotpLockoutUntil > DateTime.UtcNow)
+            throw new ForbiddenAccessException("تم قفل محاولات التحقق مؤقتًا بسبب كثرة محاولات TOTP الخاطئة.");
+
         string secretToUse;
         if (!supervisor.TotpEnabled)
         {
@@ -63,14 +67,27 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
 
         bool isValid = _totpService.VerifyCode(secretToUse, request.Code);
         if (!isValid)
+        {
+            supervisor.FailedTotpAttempts++;
+            if (supervisor.FailedTotpAttempts >= 5)
+            {
+                supervisor.TotpLockoutUntil = DateTime.UtcNow.AddMinutes(15);
+            }
+            await _dbContext.SaveChangesAsync(cancellationToken);
             throw new ValidationException("Code", "رمز التحقق خاطئ أو منتهي الصلاحية.");
+        }
+
+        // Reset failed TOTP attempts on successful verification
+        supervisor.FailedTotpAttempts = 0;
+        supervisor.TotpLockoutUntil = null;
 
         if (!supervisor.TotpEnabled)
         {
             supervisor.TotpEnabled = true;
             supervisor.TotpSecretEncrypted = _encryptionService.Encrypt(secretToUse);
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         var token = _jwtTokenGenerator.GenerateToken(supervisor.Id.ToString(), supervisor.Email, ActorType.Supervisor, null, null);
         return new AuthTokenResponseDto(token, supervisor.MustChangePassword);

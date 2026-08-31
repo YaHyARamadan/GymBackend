@@ -1,4 +1,5 @@
 using AspNetCoreRateLimit;
+using GymSaaS.API.Filters;
 using GymSaaS.API.Middleware;
 using GymSaaS.Application.Common.Behaviors;
 using GymSaaS.Infrastructure;
@@ -66,7 +67,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Hangfire Dashboard & Jobs (backend.md §3.2)
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireDashboardAuthFilter() }
+});
 
 using (var scope = app.Services.CreateScope())
 {

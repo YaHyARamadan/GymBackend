@@ -29,6 +29,11 @@ public class Owner
 
     public DateTime? LockoutUntil { get; set; }
 
+    /// <summary>Consecutive failed TOTP verification attempts</summary>
+    public int FailedTotpAttempts { get; set; } = 0;
+
+    public DateTime? TotpLockoutUntil { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
