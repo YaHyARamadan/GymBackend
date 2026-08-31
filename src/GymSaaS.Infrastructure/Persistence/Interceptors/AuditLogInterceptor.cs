@@ -74,10 +74,22 @@ public class AuditLogInterceptor : SaveChangesInterceptor
                 }
             }
 
+            // Determine actor identity: if no authenticated user is present (e.g., background/Hangfire job),
+            // mark the action as SYSTEM. Never default to Supervisor for unauthenticated actions.
+            var actorId = _currentUserService.UserId;
+            var actorType = _currentUserService.ActorType;
+
+            bool isSystemAction = string.IsNullOrEmpty(actorId);
+            if (isSystemAction)
+            {
+                actorId = "SYSTEM";
+                actorType = Domain.Enums.ActorType.System;
+            }
+
             var auditLog = new AuditLogEntry
             {
-                ActorId = _currentUserService.UserId ?? "SYSTEM",
-                ActorType = _currentUserService.ActorType ?? Domain.Enums.ActorType.Supervisor,
+                ActorId = actorId!,
+                ActorType = actorType!.Value,
                 OnBehalfOfRole = _currentUserService.OnBehalfOfRole,
                 ActionType = actionType,
                 EntityType = entityType,
@@ -88,6 +100,7 @@ public class AuditLogInterceptor : SaveChangesInterceptor
                 FacilityId = _currentUserService.FacilityId,
                 BranchId = _currentUserService.BranchId
             };
+
 
             auditEntries.Add(auditLog);
         }
