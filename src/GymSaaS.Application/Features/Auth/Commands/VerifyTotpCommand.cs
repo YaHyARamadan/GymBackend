@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GymSaaS.Application.Features.Auth.Commands;
 
-public record VerifyTotpCommand(string Email, string Code, string? SecretIfSetup) : IRequest<AuthTokenResponseDto>;
+public record VerifyTotpCommand(string TempToken, string Code) : IRequest<AuthTokenResponseDto>;
 
 public record AuthTokenResponseDto(string Token, bool MustChangePassword);
 
@@ -17,7 +17,7 @@ public class VerifyTotpCommandValidator : AbstractValidator<VerifyTotpCommand>
 {
     public VerifyTotpCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.TempToken).NotEmpty().WithMessage("توكن الجلسة المؤقتة مطلوب.");
         RuleFor(x => x.Code).NotEmpty().Length(6).WithMessage("رمز التحقق يجب أن يكون 6 أرقام.");
     }
 }
@@ -26,21 +26,32 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
 {
     private readonly DbContext _dbContext;
     private readonly ITotpService _totpService;
+    private readonly ITotpSetupTokenService _totpSetupTokenService;
     private readonly IEncryptionService _encryptionService;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
-    public VerifyTotpCommandHandler(DbContext dbContext, ITotpService totpService, IEncryptionService encryptionService, IJwtTokenGenerator jwtTokenGenerator)
+    public VerifyTotpCommandHandler(
+        DbContext dbContext,
+        ITotpService totpService,
+        ITotpSetupTokenService totpSetupTokenService,
+        IEncryptionService encryptionService,
+        IJwtTokenGenerator jwtTokenGenerator)
     {
         _dbContext = dbContext;
         _totpService = totpService;
+        _totpSetupTokenService = totpSetupTokenService;
         _encryptionService = encryptionService;
         _jwtTokenGenerator = jwtTokenGenerator;
     }
 
     public async Task<AuthTokenResponseDto> Handle(VerifyTotpCommand request, CancellationToken cancellationToken)
     {
+        var (isValidToken, supervisorId, pendingSecret) = _totpSetupTokenService.ValidateSetupToken(request.TempToken);
+        if (!isValidToken)
+            throw new ValidationException("TempToken", "جلسة التحقق منتهية الصلاحية أو غير صحيحة.");
+
         var supervisor = await _dbContext.Set<Supervisor>()
-            .FirstOrDefaultAsync(s => s.Email == request.Email, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Id == supervisorId, cancellationToken);
 
         if (supervisor == null)
             throw new NotFoundException("حساب السوبرفايزر غير موجود.");
@@ -52,21 +63,21 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
         string secretToUse;
         if (!supervisor.TotpEnabled)
         {
-            if (string.IsNullOrEmpty(request.SecretIfSetup))
-                throw new ValidationException("Secret", "رمز الإعداد غير موجود.");
+            if (string.IsNullOrEmpty(pendingSecret))
+                throw new ValidationException("Secret", "رمز الإعداد غير موجود والجلسة غير صالحة.");
 
-            secretToUse = request.SecretIfSetup;
+            secretToUse = pendingSecret;
         }
         else
         {
             if (string.IsNullOrEmpty(supervisor.TotpSecretEncrypted))
-                throw new ValidationException("Totp", "إعدادات 2FA غير اكتمال.");
+                throw new ValidationException("Totp", "إعدادات 2FA غير مكتملة.");
 
             secretToUse = _encryptionService.Decrypt(supervisor.TotpSecretEncrypted);
         }
 
-        bool isValid = _totpService.VerifyCode(secretToUse, request.Code);
-        if (!isValid)
+        bool isValidCode = _totpService.VerifyCode(secretToUse, request.Code);
+        if (!isValidCode)
         {
             supervisor.FailedTotpAttempts++;
             if (supervisor.FailedTotpAttempts >= 5)

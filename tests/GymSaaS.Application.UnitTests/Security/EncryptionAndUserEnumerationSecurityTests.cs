@@ -73,7 +73,8 @@ public class EncryptionAndUserEnumerationSecurityTests
         var mockJwt = new Mock<IJwtTokenGenerator>();
         var mockTotp = new Mock<ITotpService>();
 
-        var handler = new LoginSupervisorCommandHandler(db, mockJwt.Object, mockTotp.Object);
+        var mockTotpSetupToken = new Mock<ITotpSetupTokenService>();
+        var handler = new LoginSupervisorCommandHandler(db, mockJwt.Object, mockTotp.Object, mockTotpSetupToken.Object);
 
         // Act & Assert — User enumeration prevention: should throw ValidationException (400), not NotFoundException (404)
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>

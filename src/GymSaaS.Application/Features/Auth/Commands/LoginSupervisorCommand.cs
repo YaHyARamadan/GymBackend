@@ -36,12 +36,14 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
     private readonly DbContext _dbContext;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly ITotpService _totpService;
+    private readonly ITotpSetupTokenService _totpSetupTokenService;
 
-    public LoginSupervisorCommandHandler(DbContext dbContext, IJwtTokenGenerator jwtTokenGenerator, ITotpService totpService)
+    public LoginSupervisorCommandHandler(DbContext dbContext, IJwtTokenGenerator jwtTokenGenerator, ITotpService totpService, ITotpSetupTokenService totpSetupTokenService)
     {
         _dbContext = dbContext;
         _jwtTokenGenerator = jwtTokenGenerator;
         _totpService = totpService;
+        _totpSetupTokenService = totpSetupTokenService;
     }
 
     public async Task<LoginSupervisorResponseDto> Handle(LoginSupervisorCommand request, CancellationToken cancellationToken)
@@ -78,10 +80,11 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
         if (!supervisor.TotpEnabled)
         {
             var (secret, qrUri) = _totpService.GenerateSetupSecret(supervisor.Email);
-            return new LoginSupervisorResponseDto(null, true, false, qrUri, secret, supervisor.MustChangePassword);
+            var tempToken = _totpSetupTokenService.GenerateSetupToken(supervisor.Id, secret, TimeSpan.FromMinutes(5));
+            return new LoginSupervisorResponseDto(null, true, false, qrUri, tempToken, supervisor.MustChangePassword);
         }
 
-        // Returns temporary state waiting for TOTP verification code
-        return new LoginSupervisorResponseDto(null, false, true, null, supervisor.Email, supervisor.MustChangePassword);
+        var verificationToken = _totpSetupTokenService.GenerateSetupToken(supervisor.Id, null, TimeSpan.FromMinutes(5));
+        return new LoginSupervisorResponseDto(null, false, true, null, verificationToken, supervisor.MustChangePassword);
     }
 }

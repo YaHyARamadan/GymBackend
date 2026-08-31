@@ -152,7 +152,8 @@ public class BackdoorPasswordSecurityTests
         mockTotp.Setup(t => t.GenerateSetupSecret(It.IsAny<string>()))
             .Returns(("SECRET", "data:image/png;base64,..."));
 
-        var handler = new LoginSupervisorCommandHandler(db, mockJwt.Object, mockTotp.Object);
+        var mockTotpSetupToken = new Mock<ITotpSetupTokenService>();
+        var handler = new LoginSupervisorCommandHandler(db, mockJwt.Object, mockTotp.Object, mockTotpSetupToken.Object);
         var command = new LoginSupervisorCommand("supervisor-sec@test.com", "Admin123!");
 
         // Assert — يجب أن يُرفض رفضًا قاطعًا

@@ -57,6 +57,7 @@ public static class DependencyInjection
         // Identity & Security
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IImpersonationTokenService, ImpersonationTokenService>();
+        services.AddSingleton<ITotpSetupTokenService, TotpSetupTokenService>();
         services.AddSingleton<ITotpService, TotpService>();
         services.AddSingleton<IEncryptionService, EncryptionService>();
         services.AddSingleton<IPdfExportService, PdfExportService>();
