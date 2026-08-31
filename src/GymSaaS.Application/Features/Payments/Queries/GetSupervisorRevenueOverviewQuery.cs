@@ -43,26 +43,35 @@ public class GetSupervisorRevenueOverviewQueryHandler : IRequestHandler<GetSuper
         if (!_currentUserService.IsSupervisor)
             throw new ForbiddenAccessException("فقط السوبرفايزر يمكنه الاطلاع على تقرير الإيرادات.");
 
-        var payments = await _dbContext.Set<PaymentRecord>()
+        // Aggregate on the database instead of pulling every PaymentRecord into memory —
+        // the previous ToListAsync() with no Where/Take loaded the entire table just to sum
+        // it and then take the first 50, which only gets slower as payment history grows.
+        var paymentsQuery = _dbContext.Set<PaymentRecord>();
+
+        decimal primaryRev = await paymentsQuery
+            .Where(p => p.PaymentType == PaymentType.PlatformSubscription)
+            .SumAsync(p => p.Amount, cancellationToken);
+        decimal addOnRev = await paymentsQuery
+            .Where(p => p.PaymentType == PaymentType.AddOnFeature)
+            .SumAsync(p => p.Amount, cancellationToken);
+        decimal totalRev = primaryRev + addOnRev;
+
+        var recentDtos = await paymentsQuery
             .Include(p => p.Facility)
             .Include(p => p.AddOnFeature)
             .OrderByDescending(p => p.RecordedAt)
+            .Take(50)
+            .Select(p => new PaymentRecordDto(
+                p.Id,
+                p.FacilityId,
+                p.Facility.Name,
+                p.Amount,
+                p.PaymentType,
+                p.AddOnFeature != null ? p.AddOnFeature.Name : null,
+                p.RecordedAt,
+                p.Notes
+            ))
             .ToListAsync(cancellationToken);
-
-        decimal primaryRev = payments.Where(p => p.PaymentType == PaymentType.PlatformSubscription).Sum(p => p.Amount);
-        decimal addOnRev = payments.Where(p => p.PaymentType == PaymentType.AddOnFeature).Sum(p => p.Amount);
-        decimal totalRev = primaryRev + addOnRev;
-
-        var recentDtos = payments.Take(50).Select(p => new PaymentRecordDto(
-            p.Id,
-            p.FacilityId,
-            p.Facility.Name,
-            p.Amount,
-            p.PaymentType,
-            p.AddOnFeature?.Name,
-            p.RecordedAt,
-            p.Notes
-        )).ToList();
 
         return new RevenueOverviewDto(totalRev, primaryRev, addOnRev, recentDtos);
     }
