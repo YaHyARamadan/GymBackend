@@ -29,6 +29,8 @@ public class LoginOwnerCommandValidator : AbstractValidator<LoginOwnerCommand>
 
 public class LoginOwnerCommandHandler : IRequestHandler<LoginOwnerCommand, OwnerLoginResponseDto>
 {
+    private static readonly string DummyHash = "$2a$11$e8k8R7wA3VlB3.QvA2Z.2eP2uO8xN9m4K5L6M7N8O9P0Q1R2S3T4U";
+
     private readonly DbContext _dbContext;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
@@ -45,7 +47,11 @@ public class LoginOwnerCommandHandler : IRequestHandler<LoginOwnerCommand, Owner
             .FirstOrDefaultAsync(o => o.Email == request.Email, cancellationToken);
 
         if (owner == null)
-            throw new NotFoundException("حساب المستخدم غير موجود.");
+        {
+            // Execute dummy verify to mitigate timing side-channel attacks
+            BCrypt.Net.BCrypt.Verify(request.Password, DummyHash);
+            throw new ValidationException("Email", "البريد الإلكتروني أو كلمة السر غير صحيحة.");
+        }
 
         if (owner.LockoutUntil.HasValue && owner.LockoutUntil > DateTime.UtcNow)
             throw new ForbiddenAccessException("الحساب مقفول مؤقتًا بسبب كثرة محاولات الدخول الفاشلة.");
@@ -58,7 +64,7 @@ public class LoginOwnerCommandHandler : IRequestHandler<LoginOwnerCommand, Owner
                 owner.LockoutUntil = DateTime.UtcNow.AddMinutes(15);
             }
             await _dbContext.SaveChangesAsync(cancellationToken);
-            throw new ValidationException("Password", "كلمة السر غير صحيحة.");
+            throw new ValidationException("Email", "البريد الإلكتروني أو كلمة السر غير صحيحة.");
         }
 
         owner.FailedLoginAttempts = 0;

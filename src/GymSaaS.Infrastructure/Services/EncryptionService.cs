@@ -7,6 +7,8 @@ namespace GymSaaS.Infrastructure.Services;
 
 public class EncryptionService : IEncryptionService
 {
+    private const int NonceSize = 12; // 96 bits standard for AES-GCM
+    private const int TagSize = 16;   // 128 bits standard tag
     private readonly byte[] _key;
 
     public EncryptionService(IConfiguration configuration)
@@ -18,24 +20,59 @@ public class EncryptionService : IEncryptionService
 
     public string Encrypt(string plainText)
     {
-        using var aes = Aes.Create();
-        aes.Key = _key;
-        aes.GenerateIV();
+        byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
 
-        using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-        byte[] inputBytes = Encoding.UTF8.GetBytes(plainText);
-        byte[] encryptedBytes = encryptor.TransformFinalBlock(inputBytes, 0, inputBytes.Length);
+        byte[] nonce = new byte[NonceSize];
+        RandomNumberGenerator.Fill(nonce);
 
-        byte[] result = new byte[aes.IV.Length + encryptedBytes.Length];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(encryptedBytes, 0, result, aes.IV.Length, encryptedBytes.Length);
+        byte[] tag = new byte[TagSize];
+        byte[] cipherBytes = new byte[plainBytes.Length];
+
+        using var aesGcm = new AesGcm(_key, TagSize);
+        aesGcm.Encrypt(nonce, plainBytes, cipherBytes, tag);
+
+        // Combined payload structure: [Nonce (12) | Tag (16) | Ciphertext (N)]
+        byte[] result = new byte[NonceSize + TagSize + cipherBytes.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
+        Buffer.BlockCopy(tag, 0, result, NonceSize, TagSize);
+        Buffer.BlockCopy(cipherBytes, 0, result, NonceSize + TagSize, cipherBytes.Length);
 
         return Convert.ToBase64String(result);
     }
 
     public string Decrypt(string cipherText)
     {
-        byte[] fullCipher = Convert.FromBase64String(cipherText);
+        byte[] fullPayload = Convert.FromBase64String(cipherText);
+
+        try
+        {
+            if (fullPayload.Length >= NonceSize + TagSize)
+            {
+                byte[] nonce = new byte[NonceSize];
+                byte[] tag = new byte[TagSize];
+                byte[] cipherBytes = new byte[fullPayload.Length - NonceSize - TagSize];
+
+                Buffer.BlockCopy(fullPayload, 0, nonce, 0, NonceSize);
+                Buffer.BlockCopy(fullPayload, NonceSize, tag, 0, TagSize);
+                Buffer.BlockCopy(fullPayload, NonceSize + TagSize, cipherBytes, 0, cipherBytes.Length);
+
+                byte[] plainBytes = new byte[cipherBytes.Length];
+                using var aesGcm = new AesGcm(_key, TagSize);
+                aesGcm.Decrypt(nonce, cipherBytes, tag, plainBytes);
+
+                return Encoding.UTF8.GetString(plainBytes);
+            }
+        }
+        catch
+        {
+            // Fallback for legacy AES-CBC encrypted payloads
+        }
+
+        return DecryptLegacyCbc(fullPayload);
+    }
+
+    private string DecryptLegacyCbc(byte[] fullCipher)
+    {
         using var aes = Aes.Create();
         aes.Key = _key;
 

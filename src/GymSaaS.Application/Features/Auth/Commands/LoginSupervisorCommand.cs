@@ -31,6 +31,8 @@ public class LoginSupervisorCommandValidator : AbstractValidator<LoginSupervisor
 
 public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorCommand, LoginSupervisorResponseDto>
 {
+    private static readonly string DummyHash = "$2a$11$e8k8R7wA3VlB3.QvA2Z.2eP2uO8xN9m4K5L6M7N8O9P0Q1R2S3T4U";
+
     private readonly DbContext _dbContext;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly ITotpService _totpService;
@@ -48,7 +50,11 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
             .FirstOrDefaultAsync(s => s.Email == request.Email, cancellationToken);
 
         if (supervisor == null)
-            throw new NotFoundException("حساب السوبرفايزر غير موجود.");
+        {
+            // Execute dummy verify to mitigate timing side-channel attacks
+            BCrypt.Net.BCrypt.Verify(request.Password, DummyHash);
+            throw new ValidationException("Email", "البريد الإلكتروني أو كلمة السر غير صحيحة.");
+        }
 
         if (supervisor.LockoutUntil.HasValue && supervisor.LockoutUntil > DateTime.UtcNow)
             throw new ForbiddenAccessException("الحساب مقفول مؤقتًا بسبب كثرة محاولات الدخول الفاشلة.");
@@ -61,7 +67,7 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
                 supervisor.LockoutUntil = DateTime.UtcNow.AddMinutes(15);
             }
             await _dbContext.SaveChangesAsync(cancellationToken);
-            throw new ValidationException("Password", "كلمة السر غير صحيحة.");
+            throw new ValidationException("Email", "البريد الإلكتروني أو كلمة السر غير صحيحة.");
         }
 
         // Reset failed login attempts on success
