@@ -27,14 +27,17 @@ public static class DependencyInjection
         services.AddScoped<AuditLogInterceptor>();
 
         // Startup Secret & Connection Validation (fail-fast security enforcement)
-        var connectionString = configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured. The application cannot start without a valid database connection string.");
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured. The application cannot start without a valid database connection string.");
 
-        var jwtSecret = configuration["JwtSettings:Secret"] 
-            ?? throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
+        var jwtSecret = configuration["JwtSettings:Secret"];
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+            throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
 
-        var encryptionSecret = configuration["Encryption:SecretKey"] 
-            ?? throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption secret key.");
+        var encryptionSecret = configuration["Encryption:SecretKey"];
+        if (string.IsNullOrWhiteSpace(encryptionSecret))
+            throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption secret key.");
 
         services.AddDbContext<GymSaaSDbContext>((sp, options) =>
         {

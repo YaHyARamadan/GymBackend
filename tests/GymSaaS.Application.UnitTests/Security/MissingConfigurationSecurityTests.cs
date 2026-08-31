@@ -10,37 +10,52 @@ namespace GymSaaS.Application.UnitTests.Security;
 /// </summary>
 public class MissingConfigurationSecurityTests
 {
-    [Fact]
-    public void JwtTokenGenerator_WithoutJwtSecret_ShouldThrowInvalidOperationException()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void JwtTokenGenerator_WithoutJwtSecret_ShouldThrowInvalidOperationException(string? secretVal)
     {
-        // Arrange — configuration without JwtSettings:Secret
-        var emptyConfig = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        // Arrange — configuration with missing or empty JwtSettings:Secret
+        var inMemory = new Dictionary<string, string?>();
+        if (secretVal != null) inMemory["JwtSettings:Secret"] = secretVal;
+        var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
 
         // Act & Assert
-        var generator = new JwtTokenGenerator(emptyConfig);
+        var generator = new JwtTokenGenerator(config);
         Assert.Throws<InvalidOperationException>(() =>
             generator.GenerateToken("1", "test@test.com", GymSaaS.Domain.Enums.ActorType.Owner, 1, null));
     }
 
-    [Fact]
-    public void ImpersonationTokenService_WithoutJwtSecret_ShouldThrowInvalidOperationException()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ImpersonationTokenService_WithoutJwtSecret_ShouldThrowInvalidOperationException(string? secretVal)
     {
-        // Arrange — configuration without JwtSettings:Secret
-        var emptyConfig = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        // Arrange — configuration with missing or empty JwtSettings:Secret
+        var inMemory = new Dictionary<string, string?>();
+        if (secretVal != null) inMemory["JwtSettings:Secret"] = secretVal;
+        var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
 
         // Act & Assert
-        var service = new ImpersonationTokenService(emptyConfig);
+        var service = new ImpersonationTokenService(config);
         Assert.Throws<InvalidOperationException>(() =>
             service.GenerateImpersonationToken("1", 1, GymSaaS.Domain.Enums.ActorType.Owner, null, TimeSpan.FromMinutes(15)));
     }
 
-    [Fact]
-    public void EncryptionService_WithoutSecretKey_ShouldThrowInvalidOperationException()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void EncryptionService_WithoutSecretKey_ShouldThrowInvalidOperationException(string? secretVal)
     {
-        // Arrange — configuration without Encryption:SecretKey
-        var emptyConfig = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        // Arrange — configuration with missing or empty Encryption:SecretKey
+        var inMemory = new Dictionary<string, string?>();
+        if (secretVal != null) inMemory["Encryption:SecretKey"] = secretVal;
+        var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
 
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => new EncryptionService(emptyConfig));
+        Assert.Throws<InvalidOperationException>(() => new EncryptionService(config));
     }
 }

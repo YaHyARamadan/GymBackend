@@ -13,8 +13,9 @@ public class EncryptionService : IEncryptionService
 
     public EncryptionService(IConfiguration configuration)
     {
-        string pass = configuration["Encryption:SecretKey"] 
-            ?? throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption key.");
+        string? pass = configuration["Encryption:SecretKey"];
+        if (string.IsNullOrWhiteSpace(pass))
+            throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption key.");
         _key = Encoding.UTF8.GetBytes(pass.PadRight(32)[..32]);
     }
 

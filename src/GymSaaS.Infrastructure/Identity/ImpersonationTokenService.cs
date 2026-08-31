@@ -19,8 +19,9 @@ public class ImpersonationTokenService : IImpersonationTokenService
 
     public string GenerateImpersonationToken(string supervisorId, int facilityId, ActorType onBehalfOfRole, int? branchId, TimeSpan ttl)
     {
-        var secretKey = _configuration["JwtSettings:Secret"] 
-            ?? throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
+        var secretKey = _configuration["JwtSettings:Secret"];
+        if (string.IsNullOrWhiteSpace(secretKey))
+            throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -50,8 +51,9 @@ public class ImpersonationTokenService : IImpersonationTokenService
 
     public (bool IsValid, string? SupervisorId, int? FacilityId, ActorType? OnBehalfOfRole, int? BranchId, bool IsExpired) ValidateToken(string token)
     {
-        var secretKey = _configuration["JwtSettings:Secret"] 
-            ?? throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
+        var secretKey = _configuration["JwtSettings:Secret"];
+        if (string.IsNullOrWhiteSpace(secretKey))
+            throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
         var tokenHandler = new JwtSecurityTokenHandler();
         var validationParameters = new TokenValidationParameters
         {
