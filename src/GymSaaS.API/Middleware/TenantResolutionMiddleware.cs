@@ -13,8 +13,11 @@ public class TenantResolutionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Reject if tenant_id or facility_id is passed via query string (backend.md §0 rule 3)
-        if (context.Request.Query.ContainsKey("facility_id") || context.Request.Query.ContainsKey("facilityId"))
+        // Reject if facility_id is passed via query string or custom headers (backend.md §0 rule 3)
+        if (context.Request.Query.ContainsKey("facility_id") || 
+            context.Request.Query.ContainsKey("facilityId") ||
+            context.Request.Headers.ContainsKey("X-Facility-Id") ||
+            context.Request.Headers.ContainsKey("facility_id"))
         {
             context.Response.StatusCode = 400;
             context.Response.ContentType = "application/json";
@@ -22,7 +25,7 @@ public class TenantResolutionMiddleware
             {
                 success = false,
                 statusCode = 400,
-                message = "ممنوع إرسال معرّف المنشأة في استعلام الرابط (query string). المعرّف يؤخذ من التوكن فقط."
+                message = "ممنوع إرسال معرّف المنشأة في الاستعلام أو الترُويسات (Query/Headers). المعرّف يُستخرج حصريًا من التوكن."
             });
             await context.Response.WriteAsync(json);
             return;
