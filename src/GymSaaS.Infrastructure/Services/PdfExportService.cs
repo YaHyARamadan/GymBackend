@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using GymSaaS.Application.Common.Interfaces;
 
@@ -18,8 +19,8 @@ public class PdfExportService : IPdfExportService
         sb.AppendLine(htmlContent);
         sb.AppendLine("<hr/>");
         sb.AppendLine($"<p><strong>توقيع الأونر:</strong></p>");
-        sb.AppendLine($"<div class='signature'>{signatureText}</div>");
-        sb.AppendLine($"<div class='meta'><p>اسم الموقع: {ownerName}</p><p>عنوان IP: {ipAddress}</p><p>تاريخ ووقت التوقيع: {signedAt:yyyy-MM-dd HH:mm:ss} UTC</p></div>");
+        sb.AppendLine($"<div class='signature'>{WebUtility.HtmlEncode(signatureText)}</div>");
+        sb.AppendLine($"<div class='meta'><p>اسم الموقع: {WebUtility.HtmlEncode(ownerName)}</p><p>عنوان IP: {WebUtility.HtmlEncode(ipAddress)}</p><p>تاريخ ووقت التوقيع: {signedAt:yyyy-MM-dd HH:mm:ss} UTC</p></div>");
         sb.AppendLine("</body></html>");
 
         string fullHtml = sb.ToString();
