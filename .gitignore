@@ -1,0 +1,10 @@
+.env
+.env.local
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+logs/
+contracts/*.pdf

@@ -1,0 +1,35 @@
+using GymSaaS.Application.Features.AddOns.Commands;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace GymSaaS.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class AddOnsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public AddOnsController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateAddOn([FromBody] CreateAddOnFeatureCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(new { success = true, data = result });
+    }
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> ActivateAddOn([FromBody] ActivateFacilityAddOnCommand command, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
+    {
+        var key = idempotencyKey ?? Guid.NewGuid().ToString("N");
+        var cmd = command with { IdempotencyKey = key };
+        var result = await _mediator.Send(cmd);
+        return Ok(new { success = result, message = "تم تفعيل الميزة الإضافية وتسجيل الدفعة بنجاح." });
+    }
+}
