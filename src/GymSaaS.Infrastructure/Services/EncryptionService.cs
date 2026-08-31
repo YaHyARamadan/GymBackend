@@ -11,7 +11,8 @@ public class EncryptionService : IEncryptionService
 
     public EncryptionService(IConfiguration configuration)
     {
-        string pass = configuration["Encryption:SecretKey"] ?? "GymSaaSSecretKey32BytesLong1234!";
+        string pass = configuration["Encryption:SecretKey"] 
+            ?? throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption key.");
         _key = Encoding.UTF8.GetBytes(pass.PadRight(32)[..32]);
     }
 

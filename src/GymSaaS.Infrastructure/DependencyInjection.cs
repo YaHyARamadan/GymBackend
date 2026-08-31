@@ -26,8 +26,15 @@ public static class DependencyInjection
 
         services.AddScoped<AuditLogInterceptor>();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection") ??
-                               "Server=localhost,1433;Database=GymSaaSDb;User Id=sa;Password=Your_password123!;TrustServerCertificate=True;";
+        // Startup Secret & Connection Validation (fail-fast security enforcement)
+        var connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured. The application cannot start without a valid database connection string.");
+
+        var jwtSecret = configuration["JwtSettings:Secret"] 
+            ?? throw new InvalidOperationException("JwtSettings:Secret is not configured. The application cannot start without a valid JWT secret key.");
+
+        var encryptionSecret = configuration["Encryption:SecretKey"] 
+            ?? throw new InvalidOperationException("Encryption:SecretKey is not configured. The application cannot start without a valid encryption secret key.");
 
         services.AddDbContext<GymSaaSDbContext>((sp, options) =>
         {
@@ -52,7 +59,6 @@ public static class DependencyInjection
         services.AddSingleton<IPdfExportService, PdfExportService>();
 
         // JWT Authentication
-        var secretKey = configuration["JwtSettings:Secret"] ?? "SuperSecretKeyForGymSaaSWithMinimum32Characters!";
         services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -68,7 +74,7 @@ public static class DependencyInjection
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = configuration["JwtSettings:Issuer"] ?? "GymSaaS",
                 ValidAudience = configuration["JwtSettings:Audience"] ?? "GymSaaSClient",
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
             };
         });
 
