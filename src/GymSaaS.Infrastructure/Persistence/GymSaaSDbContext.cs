@@ -65,6 +65,11 @@ public class GymSaaSDbContext : DbContext
         modelBuilder.Entity<PlatformSubscription>().Property(p => p.AmountPaid).HasColumnType("decimal(18,2)");
         modelBuilder.Entity<Subscription>().Property(s => s.Price).HasColumnType("decimal(18,2)");
 
+        // Idempotency-Key uniqueness (prevents TOCTOU race condition duplicating PaymentRecord
+        // rows when two concurrent requests with the same key both pass the AnyAsync check
+        // before either commits — see UnlockFacilityCommand / ActivateFacilityAddOnCommand)
+        modelBuilder.Entity<PaymentRecord>().HasIndex(p => p.IdempotencyKey).IsUnique();
+
 
 
         // ─── Multi-Tenancy Global Query Filters (backend.md §0 rule 2) ───────────

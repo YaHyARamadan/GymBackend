@@ -1,3 +1,4 @@
+using FluentValidation;
 using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
 using GymSaaS.Domain.Enums;
@@ -8,6 +9,15 @@ using Microsoft.EntityFrameworkCore;
 namespace GymSaaS.Application.Features.AuditLog.Queries;
 
 public record GetAuditLogsQuery(int PageNumber = 1, int PageSize = 20) : IRequest<PaginatedAuditLogDto>;
+
+public class GetAuditLogsQueryValidator : AbstractValidator<GetAuditLogsQuery>
+{
+    public GetAuditLogsQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThan(0);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
 
 public record PaginatedAuditLogDto(List<AuditLogEntryDto> Items, int TotalCount, int PageNumber, int PageSize);
 
