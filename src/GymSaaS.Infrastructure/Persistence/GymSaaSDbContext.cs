@@ -77,7 +77,12 @@ public class GymSaaSDbContext : DbContext
             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
         });
 
-        // Multi-tenancy Global Query Filters (backend.md §0 rule 2)
+        // ─── Multi-Tenancy Global Query Filters (backend.md §0 rule 2) ───────────
+        // IsSupervisor returns TRUE only for primary supervisor tokens.
+        // During impersonation sessions, IsSupervisor = false, so the filter
+        // falls through to `FacilityId == _tenantResolver.FacilityId`, which
+        // confines the impersonator to the target facility's data only.
+        // This prevents a supervisor impersonating Facility-A from reading Facility-B data.
         modelBuilder.Entity<Branch>().HasQueryFilter(b => _tenantResolver.IsSupervisor || b.FacilityId == _tenantResolver.FacilityId);
         modelBuilder.Entity<Owner>().HasQueryFilter(o => _tenantResolver.IsSupervisor || o.FacilityId == _tenantResolver.FacilityId);
         modelBuilder.Entity<BranchManager>().HasQueryFilter(bm => _tenantResolver.IsSupervisor || bm.FacilityId == _tenantResolver.FacilityId);
