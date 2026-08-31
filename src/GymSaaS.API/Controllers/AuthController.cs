@@ -1,5 +1,6 @@
 using GymSaaS.Application.Features.Auth.Commands;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymSaaS.API.Controllers;
@@ -36,6 +37,7 @@ public class AuthController : ControllerBase
         return Ok(new { success = true, data = result });
     }
 
+    [Authorize]
     [HttpPost("impersonate")]
     public async Task<IActionResult> Impersonate([FromBody] ImpersonateCommand command)
     {

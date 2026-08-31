@@ -49,6 +49,15 @@ public class ImpersonateCommandHandler : IRequestHandler<ImpersonateCommand, Imp
         if (facility.LicenseType == LicenseType.Sold)
             throw new NotFoundException("Facility", request.FacilityId);
 
+        if (request.BranchId.HasValue)
+        {
+            var branchExists = await _dbContext.Set<Branch>()
+                .AnyAsync(b => b.Id == request.BranchId.Value && b.FacilityId == request.FacilityId, cancellationToken);
+
+            if (!branchExists)
+                throw new NotFoundException("Branch", request.BranchId.Value);
+        }
+
         var ttl = TimeSpan.FromMinutes(45);
         var token = _impersonationTokenService.GenerateImpersonationToken(
             _currentUserService.UserId!,

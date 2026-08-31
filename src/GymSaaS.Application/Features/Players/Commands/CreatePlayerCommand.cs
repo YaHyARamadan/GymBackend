@@ -3,6 +3,7 @@ using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
 using GymSaaS.Domain.Exceptions;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymSaaS.Application.Features.Players.Commands;
 
@@ -35,6 +36,13 @@ public class CreatePlayerCommandHandler : IRequestHandler<CreatePlayerCommand, P
     {
         if (!_currentUserService.FacilityId.HasValue)
             throw new ForbiddenAccessException("يجب التواجد داخل منشأة لإضافة لاعب.");
+
+        // Cross-Tenant Branch Isolation: Ensure the requested branch belongs to the current user's facility
+        var branch = await _dbContext.Set<Branch>()
+            .FirstOrDefaultAsync(b => b.Id == request.BranchId && b.FacilityId == _currentUserService.FacilityId.Value, cancellationToken);
+
+        if (branch == null)
+            throw new NotFoundException("Branch", request.BranchId);
 
         var player = new Player
         {
