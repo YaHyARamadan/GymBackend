@@ -23,6 +23,13 @@ public class TenantResolver : ITenantResolver, ICurrentUserService
     {
         get
         {
+            if (IsImpersonating)
+            {
+                var onBehalf = _httpContextAccessor.HttpContext?.User.FindFirstValue("on_behalf_of_role");
+                if (Enum.TryParse<ActorType>(onBehalf, true, out var impersonatedRole))
+                    return impersonatedRole;
+            }
+
             var val = _httpContextAccessor.HttpContext?.User.FindFirstValue("actor_type") ??
                       _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Role);
             return Enum.TryParse<ActorType>(val, true, out var result) ? result : null;
