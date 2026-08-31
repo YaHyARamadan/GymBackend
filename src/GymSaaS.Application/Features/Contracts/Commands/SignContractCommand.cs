@@ -1,6 +1,7 @@
 using FluentValidation;
 using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
+using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Exceptions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -36,9 +37,16 @@ public class SignContractCommandHandler : IRequestHandler<SignContractCommand, b
         if (!_currentUserService.FacilityId.HasValue || string.IsNullOrEmpty(_currentUserService.UserId))
             throw new ForbiddenAccessException("يجب أن تكون مسجل كأونر منشأة لتوقيع العقد.");
 
+        // ActorType must be checked explicitly: Owner/Coach/BranchManager/Receptionist are
+        // separate tables each with their own auto-increment Id, so a non-owner caller's Id can
+        // numerically collide with an unrelated Owner's Id. Without this check, e.g. Coach #1
+        // could sign the contract — and flip ContractSigned — for Owner #1 in a different facility.
+        if (_currentUserService.ActorType != ActorType.Owner)
+            throw new ForbiddenAccessException("يجب أن تكون مسجل كأونر منشأة لتوقيع العقد.");
+
         int ownerId = int.Parse(_currentUserService.UserId);
         var owner = await _dbContext.Set<Owner>()
-            .FirstOrDefaultAsync(o => o.Id == ownerId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == ownerId && o.FacilityId == _currentUserService.FacilityId.Value, cancellationToken);
 
         if (owner == null)
             throw new NotFoundException("Owner", ownerId);

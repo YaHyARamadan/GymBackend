@@ -1,6 +1,7 @@
 using FluentValidation;
 using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
+using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Exceptions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,13 @@ public class CreateBranchCommandHandler : IRequestHandler<CreateBranchCommand, B
     {
         if (!_currentUserService.FacilityId.HasValue)
             throw new ForbiddenAccessException("يجب التواجد داخل منشأة لإنشاء فرع.");
+
+        // Structural/administrative action: no role check previously existed here, so any
+        // authenticated actor carrying a facility_id claim — including Coach/Receptionist, who
+        // per backend.md §2 are merely "associated with" a branch and have no management
+        // authority over branch structure — could create branches for the facility.
+        if (_currentUserService.ActorType != ActorType.Owner)
+            throw new ForbiddenAccessException("فقط أونر المنشأة يمكنه إنشاء فرع جديد.");
 
         var branch = new Branch
         {

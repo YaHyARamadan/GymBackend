@@ -1,6 +1,7 @@
 using FluentValidation;
 using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
+using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Exceptions;
 using MediatR;
 
@@ -33,6 +34,14 @@ public class CreateSupportTicketCommandHandler : IRequestHandler<CreateSupportTi
     public async Task<SupportTicketDto> Handle(CreateSupportTicketCommand request, CancellationToken cancellationToken)
     {
         if (!_currentUserService.FacilityId.HasValue || string.IsNullOrEmpty(_currentUserService.UserId))
+            throw new ForbiddenAccessException("يجب التواجد كأونر لفتح تيكت دعم.");
+
+        // The error message above already states this is owner-only, but nothing previously
+        // enforced it: ownerId was taken straight from the UserId claim and stored as-is, so a
+        // Coach/BranchManager/Receptionist could open a ticket that appears to be from whatever
+        // Owner.Id happens to numerically match their own unrelated Id (see SignContractCommand /
+        // CompleteOnboardingCommand for the same class of issue).
+        if (_currentUserService.ActorType != ActorType.Owner)
             throw new ForbiddenAccessException("يجب التواجد كأونر لفتح تيكت دعم.");
 
         int ownerId = int.Parse(_currentUserService.UserId);
