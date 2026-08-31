@@ -63,6 +63,7 @@ app.UseIpRateLimiting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<MustChangePasswordMiddleware>();
 
 app.MapControllers();
 

@@ -65,17 +65,7 @@ public class GymSaaSDbContext : DbContext
         modelBuilder.Entity<PlatformSubscription>().Property(p => p.AmountPaid).HasColumnType("decimal(18,2)");
         modelBuilder.Entity<Subscription>().Property(s => s.Price).HasColumnType("decimal(18,2)");
 
-        // Seed initial Supervisor account (backend.md §3.9)
-        modelBuilder.Entity<Supervisor>().HasData(new Supervisor
-        {
-            Id = 1,
-            Email = "admin@gymsaas.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-            TotpEnabled = false,
-            MustChangePassword = true,
-            FailedLoginAttempts = 0,
-            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-        });
+
 
         // ─── Multi-Tenancy Global Query Filters (backend.md §0 rule 2) ───────────
         // IsSupervisor returns TRUE only for primary supervisor tokens.

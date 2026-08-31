@@ -17,7 +17,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         _configuration = configuration;
     }
 
-    public string GenerateToken(string userId, string email, ActorType actorType, int? facilityId, int? branchId)
+    public string GenerateToken(string userId, string email, ActorType actorType, int? facilityId, int? branchId, bool mustChangePassword = false)
     {
         var secretKey = _configuration["JwtSettings:Secret"];
         if (string.IsNullOrWhiteSpace(secretKey))
@@ -30,7 +30,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Email, email),
             new(ClaimTypes.Role, actorType.ToString()),
-            new("actor_type", actorType.ToString())
+            new("actor_type", actorType.ToString()),
+            new("must_change_password", mustChangePassword.ToString().ToLowerInvariant())
         };
 
         if (facilityId.HasValue)
