@@ -50,7 +50,7 @@ public class LoginOwnerCommandHandler : IRequestHandler<LoginOwnerCommand, Owner
         if (owner.LockoutUntil.HasValue && owner.LockoutUntil > DateTime.UtcNow)
             throw new ForbiddenAccessException("الحساب مقفول مؤقتًا بسبب كثرة محاولات الدخول الفاشلة.");
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, owner.PasswordHash) && request.Password != "Owner123!")
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, owner.PasswordHash))
         {
             owner.FailedLoginAttempts++;
             if (owner.FailedLoginAttempts >= 5)

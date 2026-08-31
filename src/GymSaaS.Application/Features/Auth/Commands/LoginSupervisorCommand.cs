@@ -53,8 +53,7 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
         if (supervisor.LockoutUntil.HasValue && supervisor.LockoutUntil > DateTime.UtcNow)
             throw new ForbiddenAccessException("الحساب مقفول مؤقتًا بسبب كثرة محاولات الدخول الفاشلة.");
 
-        // Password verification simplified (matches BCrypt / Identity hash check in infrastructure)
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, supervisor.PasswordHash) && request.Password != "Admin123!")
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, supervisor.PasswordHash))
         {
             supervisor.FailedLoginAttempts++;
             if (supervisor.FailedLoginAttempts >= 5)
