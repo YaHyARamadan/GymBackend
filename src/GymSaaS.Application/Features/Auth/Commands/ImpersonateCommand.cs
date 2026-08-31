@@ -17,7 +17,15 @@ public class ImpersonateCommandValidator : AbstractValidator<ImpersonateCommand>
     public ImpersonateCommandValidator()
     {
         RuleFor(x => x.FacilityId).GreaterThan(0);
-        RuleFor(x => x.TargetRole).IsInEnum();
+        // backend.md §3.1: role switching is limited to Owner/BranchManager/Coach/Reception.
+        // IsInEnum() alone let a caller request TargetRole = Supervisor or System, minting an
+        // impersonation token whose on_behalf_of_role claim (read by ICurrentUserService.ActorType
+        // while impersonating) then reads as "Supervisor"/"System" — a role GetAuditLogsQuery and
+        // similar checks never anticipated, letting it slip past the Coach/Receptionist deny-list
+        // and the BranchManager branch-scoping without tripping either one.
+        RuleFor(x => x.TargetRole)
+            .Must(role => role is ActorType.Owner or ActorType.BranchManager or ActorType.Coach or ActorType.Receptionist)
+            .WithMessage("الدور المطلوب غير صالح لتبديل الأنشطة (Owner/BranchManager/Coach/Reception فقط).");
     }
 }
 
