@@ -44,4 +44,12 @@ public class AuthController : ControllerBase
         var result = await _mediator.Send(command);
         return Ok(new { success = true, data = result });
     }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(new { success = true, data = result });
+    }
 }

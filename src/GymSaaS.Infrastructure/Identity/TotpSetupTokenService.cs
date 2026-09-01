@@ -9,6 +9,17 @@ namespace GymSaaS.Infrastructure.Identity;
 
 public class TotpSetupTokenService : ITotpSetupTokenService
 {
+    // This token is a bridge state BEFORE full authentication (issued after password check,
+    // before TOTP verification) and must never be usable as a general Bearer token. Using the
+    // real ValidAudience ("GymSaaSClient") here previously meant it passed the app-wide
+    // [Authorize] pipeline like any full session token — protected only by the accident that no
+    // handler currently trusts [Authorize] alone (see ActorType/FacilityId checks added to
+    // ChangePasswordCommand, CreateBranchCommand, etc.). Giving it its own audience makes
+    // AddJwtBearer's ValidateAudience reject it outright, so a caller who only has valid
+    // credentials but hasn't passed 2FA can never reach a protected endpoint with it, regardless
+    // of what any individual handler does or doesn't check.
+    private const string SetupTokenAudience = "GymSaaS.TotpSetup";
+
     private readonly IConfiguration _configuration;
 
     public TotpSetupTokenService(IConfiguration configuration)
@@ -39,7 +50,7 @@ public class TotpSetupTokenService : ITotpSetupTokenService
 
         var token = new JwtSecurityToken(
             issuer: _configuration["JwtSettings:Issuer"] ?? "GymSaaS",
-            audience: _configuration["JwtSettings:Audience"] ?? "GymSaaSClient",
+            audience: SetupTokenAudience,
             claims: claims,
             expires: DateTime.UtcNow.Add(ttl),
             signingCredentials: credentials);
@@ -59,7 +70,8 @@ public class TotpSetupTokenService : ITotpSetupTokenService
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
             ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateAudience = true,
+            ValidAudience = SetupTokenAudience,
             ClockSkew = TimeSpan.Zero
         };
 

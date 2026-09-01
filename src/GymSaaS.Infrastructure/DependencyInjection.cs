@@ -1,5 +1,6 @@
 using System.Text;
 using GymSaaS.Application.Common.Interfaces;
+using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Interfaces;
 using GymSaaS.Infrastructure.Identity;
 using GymSaaS.Infrastructure.Jobs;
@@ -12,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 
 namespace GymSaaS.Infrastructure;
 
@@ -79,6 +81,51 @@ public static class DependencyInjection
                 ValidIssuer = configuration["JwtSettings:Issuer"] ?? "GymSaaS",
                 ValidAudience = configuration["JwtSettings:Audience"] ?? "GymSaaSClient",
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            };
+
+            // Revocation check: stateless JWTs otherwise stay valid for their full 7-day lifetime
+            // no matter what happens to the account afterward — there is no logout/blacklist
+            // mechanism anywhere in this app. Changing the Supervisor password now bumps
+            // TokenVersion and stamps it into new tokens as "token_version"; here we reject any
+            // token whose version doesn't match the current DB value, which is what actually
+            // invalidates every older/stolen token the moment the password is changed.
+            // Scoped to Supervisor only (single row, single indexed lookup, negligible per-request
+            // cost) rather than every actor type, to avoid turning this into a DB hit on every
+            // request platform-wide — see backend.md discussion referenced in ChangePasswordCommand.
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var actorType = context.Principal?.FindFirstValue("actor_type");
+                    if (actorType != nameof(ActorType.Supervisor))
+                        return;
+
+                    // Impersonation tokens are minted by ImpersonationTokenService, not
+                    // JwtTokenGenerator, and never carry a token_version claim — skip them.
+                    var isImpersonating = context.Principal?.FindFirstValue("is_impersonating");
+                    if (isImpersonating == "true")
+                        return;
+
+                    var versionClaim = context.Principal?.FindFirstValue("token_version");
+                    var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                    if (!int.TryParse(versionClaim, out var tokenVersion) || !int.TryParse(userId, out var supervisorId))
+                    {
+                        context.Fail("Invalid token version claim.");
+                        return;
+                    }
+
+                    var dbContext = context.HttpContext.RequestServices.GetRequiredService<DbContext>();
+                    var currentVersion = await dbContext.Set<GymSaaS.Domain.Entities.Supervisor>()
+                        .Where(s => s.Id == supervisorId)
+                        .Select(s => s.TokenVersion)
+                        .FirstOrDefaultAsync();
+
+                    if (currentVersion != tokenVersion)
+                    {
+                        context.Fail("Token has been revoked.");
+                    }
+                }
             };
         });
 

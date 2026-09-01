@@ -56,10 +56,23 @@ public class GetAuditLogsQueryHandler : IRequestHandler<GetAuditLogsQuery, Pagin
 
         var query = _dbContext.Set<AuditLogEntry>().AsQueryable();
 
-        // BranchManager sees only their branch (backend.md §3.2)
-        if (_currentUserService.ActorType == ActorType.BranchManager && _currentUserService.BranchId.HasValue)
+        // Supervisor (global, real session — not impersonating) is the only actor allowed to see
+        // audit logs across every tenant. Every other actor type — including Owner, who has no
+        // explicit scoping below prior to this fix — must be confined to their own facility, or
+        // they can read every other gym's audit trail (PII, price changes, lock/unlock events, etc.)
+        // by simply calling this endpoint with a normal Owner token.
+        if (_currentUserService.ActorType != ActorType.Supervisor)
         {
-            query = query.Where(a => a.BranchId == _currentUserService.BranchId.Value);
+            if (!_currentUserService.FacilityId.HasValue)
+                throw new ForbiddenAccessException("ليس لديك صلاحية للوصول إلى سجل الأنشطة.");
+
+            query = query.Where(a => a.FacilityId == _currentUserService.FacilityId.Value);
+
+            // BranchManager is additionally scoped down to only their own branch (backend.md §3.2)
+            if (_currentUserService.ActorType == ActorType.BranchManager && _currentUserService.BranchId.HasValue)
+            {
+                query = query.Where(a => a.BranchId == _currentUserService.BranchId.Value);
+            }
         }
 
         int totalCount = await query.CountAsync(cancellationToken);

@@ -22,6 +22,14 @@ public class Supervisor
     /// <summary>Force password change on first login</summary>
     public bool MustChangePassword { get; set; } = true;
 
+    /// <summary>
+    /// Bumped on every password change. Embedded in issued JWTs as the "token_version" claim
+    /// and checked against this column on every request (see JwtBearer OnTokenValidated in
+    /// Infrastructure/DependencyInjection.cs) so that changing the password immediately
+    /// invalidates every previously issued token, not just the one the client happens to swap in.
+    /// </summary>
+    public int TokenVersion { get; set; } = 0;
+
     /// <summary>Consecutive failed login attempts for brute-force protection</summary>
     public int FailedLoginAttempts { get; set; } = 0;
 

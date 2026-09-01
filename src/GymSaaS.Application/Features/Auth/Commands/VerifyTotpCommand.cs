@@ -100,7 +100,7 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var token = _jwtTokenGenerator.GenerateToken(supervisor.Id.ToString(), supervisor.Email, ActorType.Supervisor, null, null, supervisor.MustChangePassword);
+        var token = _jwtTokenGenerator.GenerateToken(supervisor.Id.ToString(), supervisor.Email, ActorType.Supervisor, null, null, supervisor.MustChangePassword, supervisor.TokenVersion);
         return new AuthTokenResponseDto(token, supervisor.MustChangePassword);
     }
 }
