@@ -25,6 +25,8 @@
 - `on_behalf_of_role: Owner | BranchManager | Coach | Receptionist`
 - `supervisor_id: <ID>`
 
+⚠️ ملاحظة مهمة: صلاحيات الـ backend أثناء الـ impersonation بتتحدد فعليًا بـ `on_behalf_of_role`، مش بأي claim تاني — يعني لو السوبرفايزر عمل impersonate بدور Coach، هيشوف بالظبط اللي الـ Coach الحقيقي يشوفه (زي: ممنوع من `GET /api/auditlog` بالكامل)، مش صلاحيات Supervisor موسّعة. الفرونت لازم يعامل الـ impersonation session بنفس قيود الدور المختار بالظبط، مش كاستثناء.
+
 عند انتهاء توكن الـ Impersonation خلال الاستخدام، يرجع الباك إند:
 `HTTP 401 Unauthorized` مع `errorCode: "IMPERSONATION_EXPIRED"` — **يجب على الفرونت فتح المودال الخاص بتجديد التوكن بدلاً من تسجيل الخروج.**
 
@@ -87,7 +89,7 @@
     "requiresTotpSetup": true,
     "requiresTotpVerification": false,
     "totpSetupQrUri": "data:image/png;base64,...",
-    "temporaryToken": "BASE32_SECRET",
+    "temporaryToken": "SERVER_SIGNED_TEMP_TOKEN",
     "mustChangePassword": true
   }
 }
@@ -102,11 +104,13 @@
     "requiresTotpSetup": false,
     "requiresTotpVerification": true,
     "totpSetupQrUri": null,
-    "temporaryToken": "admin@gymsaas.com",
+    "temporaryToken": "SERVER_SIGNED_TEMP_TOKEN",
     "mustChangePassword": false
   }
 }
 ```
+
+⚠️ **`temporaryToken` ماعادش الإيميل ولا السكرت الخام** — بقى توكن قصير العمر (5 دقايق) موقّع بالسيرفر (`TotpSetupTokenService`)، بيتولّد **بعد نجاح فحص الباسورد فقط**. الفرونت يبعته زي ما هو لـ `verify-totp`، مايقدرش يستخرج منه أو يعدّل فيه أي حاجة.
 
 ---
 
@@ -116,11 +120,11 @@
 - **Request Body:**
 ```json
 {
-  "email": "admin@gymsaas.com",
-  "code": "123456",
-  "secretIfSetup": "OPTIONAL_SECRET_ON_FIRST_SETUP"
+  "tempToken": "SERVER_SIGNED_TEMP_TOKEN_FROM_LOGIN_STEP",
+  "code": "123456"
 }
 ```
+⚠️ **مفيش `email` ولا `secretIfSetup` في الطلب** — الـ `supervisorId` والسكرت (وقت أول إعداد) بيتم استخراجهم من `tempToken` نفسه على السيرفر، مش من أي حاجة تانية بيبعتها العميل. الـ endpoint ده **لا يعمل إطلاقًا من غير `tempToken` صادر فعليًا من `login/supervisor`** بعد نجاح الباسورد.
 
 - **Response:**
 ```json
@@ -132,6 +136,31 @@
   }
 }
 ```
+
+---
+
+#### `POST /api/auth/change-password`
+تغيير كلمة السر (Supervisor أو Owner، متاح دايمًا، **إجباري** لو `mustChangePassword: true` في التوكن — أي endpoint تاني غيره وغير `logout` هيترفض بـ `403` طول ما الفلاج ده شغال).
+
+- **Headers:** `Authorization: Bearer <Token>` (توكن عادي، حتى لو `mustChangePassword: true`)
+- **Request Body:**
+```json
+{
+  "currentPassword": "OldPassword123!",
+  "newPassword": "NewStrongerPassword456!"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1...",
+    "mustChangePassword": false
+  }
+}
+```
+⚠️ التوكن القديم بيتلغى تلقائيًا بعد تغيير الباسورد (`TokenVersion` بتزيد بواحد على مستوى الحساب) — أي توكن اتصدر قبل التغيير مايشتغلش تاني، حتى لو لسه في تاريخ انتهائه.
 
 ---
 
@@ -164,6 +193,7 @@
 #### `POST /api/auth/impersonate`
 تبديل دور السوبرفايزر لتمثيل Role محدد داخل منشأة.
 
+- **Headers:** `Authorization: Bearer <Normal Supervisor Token>`
 - **Request Body:**
 ```json
 {
@@ -172,6 +202,7 @@
   "branchId": null
 }
 ```
+⚠️ `targetRole` مقيّد بقيم `Owner | BranchManager | Coach | Receptionist` بس — أي قيمة تانية (بما فيها `Supervisor` نفسها) بترفض.
 
 - **Response:**
 ```json
@@ -436,3 +467,92 @@
   }
 }
 ```
+
+---
+
+### 4.8 Branches (`/api/branches`)
+
+#### `POST /api/branches`
+إضافة فرع جديد (`FacilityId` بياخد قيمته من التوكن، مش من الطلب).
+
+- **Request Body:**
+```json
+{
+  "name": "فرع سموحة",
+  "address": "شارع فؤاد، سموحة، الإسكندرية",
+  "phone": "0312345678"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 3,
+    "name": "فرع سموحة",
+    "address": "شارع فؤاد، سموحة، الإسكندرية",
+    "phone": "0312345678",
+    "facilityId": 1
+  }
+}
+```
+
+---
+
+### 4.9 Players (`/api/players`)
+
+#### `POST /api/players`
+إضافة لاعب جديد (`FacilityId` من التوكن؛ `branchId` يتم التحقق منه إنه تابع لنفس المنشأة قبل الإضافة — أي `branchId` تابع لمنشأة تانية يترفض بـ `404 NotFound`).
+
+- **Request Body:**
+```json
+{
+  "name": "أحمد محمد",
+  "email": "ahmed@example.com",
+  "phone": "01012345678",
+  "dateOfBirth": "1995-03-10",
+  "branchId": 3
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 42,
+    "name": "أحمد محمد",
+    "email": "ahmed@example.com",
+    "branchId": 3,
+    "facilityId": 1
+  }
+}
+```
+
+---
+
+### 4.10 Support Tickets (`/api/support`)
+
+#### `POST /api/support/tickets`
+فتح تذكرة دعم داخل الداشبورد (بديل التواصل الخارجي — الأونر يتواصل مع السوبرفايزر من هنا).
+
+- **Request Body:**
+```json
+{
+  "subject": "مشكلة في عرض التقارير",
+  "initialMessage": "التقرير الشهري مش بيظهر بيانات فرع سموحة"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 7,
+    "subject": "مشكلة في عرض التقارير",
+    "status": "Open",
+    "senderActorType": "Owner",
+    "createdAt": "2026-09-01T10:00:00Z"
+  }
+}
+```
+⚠️ لو اتفتحت أثناء سيشن impersonation، `senderActorType` بيسجل **الدور الحقيقي المُمثَّل** (Owner/BranchManager/إلخ)، مش `Supervisor` دايمًا.
