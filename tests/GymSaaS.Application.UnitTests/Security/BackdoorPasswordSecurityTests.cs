@@ -84,7 +84,7 @@ public class BackdoorPasswordSecurityTests
 
         var mockJwt = new Mock<IJwtTokenGenerator>();
         mockJwt.Setup(j => j.GenerateToken(It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<GymSaaS.Domain.Enums.ActorType>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool>()))
+            It.IsAny<GymSaaS.Domain.Enums.ActorType>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool>(), It.IsAny<int>()))
             .Returns("valid_token");
 
         var handler = new LoginOwnerCommandHandler(db, mockJwt.Object);

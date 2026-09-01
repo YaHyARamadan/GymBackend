@@ -50,24 +50,25 @@ public class UnlockFacilityCommandHandler : IRequestHandler<UnlockFacilityComman
             RecordedAt = DateTime.UtcNow,
             Notes = "فك قفل وتأكيد اشتراك المنشأة"
         };
-        _dbContext.Set<PaymentRecord>().Add(payment);
-
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (await _dbContext.Set<PaymentRecord>()
-            .AnyAsync(p => p.IdempotencyKey == request.IdempotencyKey, cancellationToken))
+        catch (DbUpdateException)
         {
-            // The initial AnyAsync check above is inherently check-then-act (TOCTOU): a
-            // concurrent request carrying the same IdempotencyKey can pass that check before
-            // either transaction commits. The unique index on PaymentRecord.IdempotencyKey
-            // (see GymSaaSDbContext) makes the database the final arbiter — if SaveChanges
-            // fails and a matching record now exists, the other request won the race and
-            // already recorded this payment, so we treat this as idempotent success rather
-            // than double-charging or surfacing a spurious 500.
-            _dbContext.Entry(payment).State = EntityState.Detached;
-            return true;
+            if (await _dbContext.Set<PaymentRecord>().AnyAsync(p => p.IdempotencyKey == request.IdempotencyKey, cancellationToken))
+            {
+                // The initial AnyAsync check above is inherently check-then-act (TOCTOU): a
+                // concurrent request carrying the same IdempotencyKey can pass that check before
+                // either transaction commits. The unique index on PaymentRecord.IdempotencyKey
+                // (see GymSaaSDbContext) makes the database the final arbiter — if SaveChanges
+                // fails and a matching record now exists, the other request won the race and
+                // already recorded this payment, so we treat this as idempotent success rather
+                // than double-charging or surfacing a spurious 500.
+                _dbContext.Entry(payment).State = EntityState.Detached;
+                return true;
+            }
+            throw;
         }
 
         return true;

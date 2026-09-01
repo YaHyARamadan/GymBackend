@@ -96,16 +96,19 @@ public class ActivateFacilityAddOnCommandHandler : IRequestHandler<ActivateFacil
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (await _dbContext.Set<PaymentRecord>()
-            .AnyAsync(p => p.IdempotencyKey == request.IdempotencyKey, cancellationToken))
+        catch (DbUpdateException)
         {
-            // Same TOCTOU window as UnlockFacilityCommand: the AnyAsync check above can be
-            // passed by two concurrent requests carrying the same IdempotencyKey before either
-            // commits. The unique index on PaymentRecord.IdempotencyKey makes the database the
-            // final arbiter — if SaveChanges fails and a matching record now exists, the other
-            // request already recorded this payment/activation, so this is idempotent success.
-            _dbContext.Entry(payment).State = EntityState.Detached;
-            return true;
+            if (await _dbContext.Set<PaymentRecord>().AnyAsync(p => p.IdempotencyKey == request.IdempotencyKey, cancellationToken))
+            {
+                // Same TOCTOU window as UnlockFacilityCommand: the AnyAsync check above can be
+                // passed by two concurrent requests carrying the same IdempotencyKey before either
+                // commits. The unique index on PaymentRecord.IdempotencyKey makes the database the
+                // final arbiter — if SaveChanges fails and a matching record now exists, the other
+                // request already recorded this payment/activation, so this is idempotent success.
+                _dbContext.Entry(payment).State = EntityState.Detached;
+                return true;
+            }
+            throw;
         }
 
         return true;
