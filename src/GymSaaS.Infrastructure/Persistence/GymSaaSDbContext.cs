@@ -68,7 +68,33 @@ public class GymSaaSDbContext : DbContext
         // Idempotency-Key uniqueness (prevents TOCTOU race condition duplicating PaymentRecord
         // rows when two concurrent requests with the same key both pass the AnyAsync check
         // before either commits — see UnlockFacilityCommand / ActivateFacilityAddOnCommand)
+        modelBuilder.Entity<PaymentRecord>().Property(p => p.IdempotencyKey).HasMaxLength(450);
         modelBuilder.Entity<PaymentRecord>().HasIndex(p => p.IdempotencyKey).IsUnique();
+
+        // Prevent SQL Server multiple cascade path cycles (Error 1785)
+        modelBuilder.Entity<Coach>()
+            .HasOne(c => c.Facility)
+            .WithMany()
+            .HasForeignKey(c => c.FacilityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Receptionist>()
+            .HasOne(r => r.Facility)
+            .WithMany()
+            .HasForeignKey(r => r.FacilityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Player>()
+            .HasOne(p => p.Facility)
+            .WithMany()
+            .HasForeignKey(p => p.FacilityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupportTicket>()
+            .HasOne(s => s.Facility)
+            .WithMany()
+            .HasForeignKey(s => s.FacilityId)
+            .OnDelete(DeleteBehavior.Restrict);
 
 
 

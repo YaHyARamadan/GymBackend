@@ -14,10 +14,22 @@ public class ImpersonationGuardMiddleware
 
     public async Task InvokeAsync(HttpContext context, IImpersonationTokenService impersonationTokenService)
     {
+        // Support cookie-first architecture: read from gymsaas_token cookie when there is
+        // no Authorization header (the frontend now uses httpOnly cookies exclusively).
         var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+        string? token = null;
+
         if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            var token = authHeader["Bearer ".Length..].Trim();
+            token = authHeader["Bearer ".Length..].Trim();
+        }
+        else
+        {
+            token = context.Request.Cookies["gymsaas_token"];
+        }
+
+        if (!string.IsNullOrEmpty(token))
+        {
             var (isValid, _, _, _, _, isExpired) = impersonationTokenService.ValidateToken(token);
 
             if (isExpired)

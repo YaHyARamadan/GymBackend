@@ -10,6 +10,15 @@ namespace GymSaaS.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AlterColumn<string>(
+                name: "IdempotencyKey",
+                table: "PaymentRecords",
+                type: "nvarchar(450)",
+                maxLength: 450,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
+
             // Enforce idempotency at the database level: a unique index closes the TOCTOU
             // window in UnlockFacilityCommand / ActivateFacilityAddOnCommand, where two
             // concurrent requests with the same IdempotencyKey could both pass the

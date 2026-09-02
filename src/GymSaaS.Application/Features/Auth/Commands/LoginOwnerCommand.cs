@@ -43,6 +43,7 @@ public class LoginOwnerCommandHandler : IRequestHandler<LoginOwnerCommand, Owner
     public async Task<OwnerLoginResponseDto> Handle(LoginOwnerCommand request, CancellationToken cancellationToken)
     {
         var owner = await _dbContext.Set<Owner>()
+            .IgnoreQueryFilters()
             .Include(o => o.Facility)
             .FirstOrDefaultAsync(o => o.Email == request.Email, cancellationToken);
 

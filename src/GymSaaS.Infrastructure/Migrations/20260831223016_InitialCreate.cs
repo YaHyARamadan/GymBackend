@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -254,7 +254,7 @@ namespace GymSaaS.Infrastructure.Migrations
                     AddOnFeatureId = table.Column<int>(type: "int", nullable: true),
                     Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     RecordedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IdempotencyKey = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    IdempotencyKey = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -354,8 +354,7 @@ namespace GymSaaS.Infrastructure.Migrations
                         name: "FK_Coaches_Facilities_FacilityId",
                         column: x => x.FacilityId,
                         principalTable: "Facilities",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -388,8 +387,7 @@ namespace GymSaaS.Infrastructure.Migrations
                         name: "FK_Receptionists_Facilities_FacilityId",
                         column: x => x.FacilityId,
                         principalTable: "Facilities",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -444,8 +442,7 @@ namespace GymSaaS.Infrastructure.Migrations
                         name: "FK_SupportTickets_Facilities_FacilityId",
                         column: x => x.FacilityId,
                         principalTable: "Facilities",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_SupportTickets_Owners_OwnerId",
                         column: x => x.OwnerId,
@@ -485,8 +482,7 @@ namespace GymSaaS.Infrastructure.Migrations
                         name: "FK_Players_Facilities_FacilityId",
                         column: x => x.FacilityId,
                         principalTable: "Facilities",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_Players_Subscriptions_SubscriptionId",
                         column: x => x.SubscriptionId,

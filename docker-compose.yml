@@ -6,7 +6,7 @@ services:
     ports:
       - "5000:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=db,1433;Database=GymSaaSDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - Encryption__SecretKey=${ENCRYPTION_KEY}
@@ -22,6 +22,8 @@ services:
     ports:
       - "1433:1433"
     healthcheck:
-      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-U", "sa", "-P", "$SA_PASSWORD", "-Q", "SELECT 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -U sa -P \"${SA_PASSWORD}\" -C -Q \"SELECT 1\" || exit 1"]
       interval: 10s
       retries: 10
+
+

@@ -94,6 +94,20 @@ public static class DependencyInjection
             // request platform-wide — see backend.md discussion referenced in ChangePasswordCommand.
             options.Events = new JwtBearerEvents
             {
+                // Cookie-first extraction: if no Authorization header is present (frontend
+                // now sends the JWT exclusively via httpOnly cookie), pull it from there.
+                // This must run before OnTokenValidated, which is why it uses OnMessageReceived.
+                OnMessageReceived = context =>
+                {
+                    if (string.IsNullOrEmpty(context.Token))
+                    {
+                        var cookieToken = context.HttpContext.Request.Cookies["gymsaas_token"];
+                        if (!string.IsNullOrEmpty(cookieToken))
+                            context.Token = cookieToken;
+                    }
+                    return Task.CompletedTask;
+                },
+
                 OnTokenValidated = async context =>
                 {
                     var actorType = context.Principal?.FindFirstValue("actor_type");
