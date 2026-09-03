@@ -4,6 +4,7 @@ using GymSaaS.Domain.Entities;
 using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Exceptions;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymSaaS.Application.Features.Support.Commands;
 
@@ -69,6 +70,22 @@ public class CreateSupportTicketCommandHandler : IRequestHandler<CreateSupportTi
 
         _dbContext.Set<SupportTicketMessage>().Add(msg);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var supervisorId = await _dbContext.Set<Supervisor>()
+            .Select(s => (int?)s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (supervisorId.HasValue)
+        {
+            _dbContext.Set<Notification>().Add(new Notification
+            {
+                RecipientId = supervisorId.Value.ToString(),
+                RecipientActorType = ActorType.Supervisor,
+                FacilityId = ticket.FacilityId,
+                Title = "New support ticket",
+                Message = $"A new ticket was opened: {ticket.Subject}"
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return new SupportTicketDto(ticket.Id, ticket.Subject, ticket.Status, ticket.CreatedAt);
     }

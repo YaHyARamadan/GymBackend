@@ -27,6 +27,7 @@ public class ImpersonationTokenService : IImpersonationTokenService
 
         var claims = new List<Claim>
         {
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new(ClaimTypes.NameIdentifier, supervisorId),
             new("supervisor_id", supervisorId),
             new("actor_type", "SUPERVISOR"),

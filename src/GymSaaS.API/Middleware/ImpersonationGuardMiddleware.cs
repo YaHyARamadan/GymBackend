@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using GymSaaS.Application.Common.Interfaces;
 
@@ -30,7 +31,23 @@ public class ImpersonationGuardMiddleware
 
         if (!string.IsNullOrEmpty(token))
         {
-            var (isValid, _, _, _, _, isExpired) = impersonationTokenService.ValidateToken(token);
+            // Only inspect expiry for tokens that identify themselves as impersonation
+            // tokens. A normal expired JWT must be handled by JwtBearer as a regular 401.
+            var isImpersonationToken = false;
+            try
+            {
+                var untrustedToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+                isImpersonationToken = untrustedToken.Claims.Any(c =>
+                    c.Type == "is_impersonating" && c.Value == "true");
+            }
+            catch
+            {
+                // JwtBearer remains responsible for malformed token responses.
+            }
+
+            var (_, _, _, _, _, isExpired) = isImpersonationToken
+                ? impersonationTokenService.ValidateToken(token)
+                : (false, null, null, null, null, false);
 
             if (isExpired)
             {

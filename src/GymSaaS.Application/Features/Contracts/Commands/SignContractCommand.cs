@@ -57,6 +57,17 @@ public class SignContractCommandHandler : IRequestHandler<SignContractCommand, b
         if (contract == null)
             throw new NotFoundException("Contract", request.ContractId);
 
+        if (!contract.IsActive)
+            throw new ConflictException("Cannot sign an inactive contract version.");
+
+        var alreadySigned = await _dbContext.Set<ContractApproval>()
+            .AnyAsync(a => a.OwnerId == owner.Id &&
+                          a.ContractId == contract.Id &&
+                          a.ContractVersion == contract.Version,
+                cancellationToken);
+        if (alreadySigned)
+            return true;
+
         var approval = new ContractApproval
         {
             ContractId = contract.Id,

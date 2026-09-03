@@ -100,7 +100,18 @@ public class VerifyTotpCommandHandler : IRequestHandler<VerifyTotpCommand, AuthT
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var token = _jwtTokenGenerator.GenerateToken(supervisor.Id.ToString(), supervisor.Email, ActorType.Supervisor, null, null, supervisor.MustChangePassword, supervisor.TokenVersion);
-        return new AuthTokenResponseDto(token, supervisor.MustChangePassword);
+        // A password change is required only during the initial TOTP setup.
+        // Later logins use an existing TOTP secret and must go straight to the app.
+        var mustChangePassword = supervisor.MustChangePassword && pendingSecret is not null;
+
+        var token = _jwtTokenGenerator.GenerateToken(
+            supervisor.Id.ToString(),
+            supervisor.Email,
+            ActorType.Supervisor,
+            null,
+            null,
+            mustChangePassword,
+            supervisor.TokenVersion);
+        return new AuthTokenResponseDto(token, mustChangePassword);
     }
 }

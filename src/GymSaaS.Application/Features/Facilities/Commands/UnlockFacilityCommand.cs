@@ -50,6 +50,17 @@ public class UnlockFacilityCommandHandler : IRequestHandler<UnlockFacilityComman
             RecordedAt = DateTime.UtcNow,
             Notes = "فك قفل وتأكيد اشتراك المنشأة"
         };
+        var supervisorId = await _dbContext.Set<Supervisor>()
+            .Select(s => (int?)s.Id).FirstOrDefaultAsync(cancellationToken);
+        if (supervisorId.HasValue)
+            _dbContext.Set<Notification>().Add(new Notification
+            {
+                RecipientId = supervisorId.Value.ToString(),
+                RecipientActorType = ActorType.Supervisor,
+                FacilityId = facility.Id,
+                Title = "Facility unlocked",
+                Message = $"Facility #{facility.Id} was unlocked and payment was recorded."
+            });
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);

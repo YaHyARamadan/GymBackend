@@ -1,4 +1,6 @@
 using GymSaaS.Application.Features.Branches.Commands;
+using GymSaaS.Application.Features.Branches.Queries;
+using GymSaaS.Application.Features.Facilities.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +23,12 @@ public class BranchesController : ControllerBase
     public async Task<IActionResult> CreateBranch([FromBody] CreateBranchCommand command)
     {
         var result = await _mediator.Send(command);
+        return Ok(new { success = true, data = result });
+    }
+    [HttpGet]
+    public async Task<IActionResult> GetBranches()
+    {
+        var result = await _mediator.Send(new GetBranchesQuery());
         return Ok(new { success = true, data = result });
     }
 }

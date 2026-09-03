@@ -34,6 +34,8 @@ public class GymSaaSDbContext : DbContext
     public DbSet<FacilityAddOnSubscription> FacilityAddOnSubscriptions => Set<FacilityAddOnSubscription>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<SupportTicketMessage> SupportTicketMessages => Set<SupportTicketMessage>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -57,6 +59,20 @@ public class GymSaaSDbContext : DbContext
         modelBuilder.Entity<PlatformSubscription>(b =>
         {
             b.Property(p => p.RowVersion).IsRowVersion();
+        });
+
+        modelBuilder.Entity<Notification>(b =>
+        {
+            b.Property(n => n.RecipientId).HasMaxLength(100).IsRequired();
+            b.Property(n => n.Title).HasMaxLength(200).IsRequired();
+            b.Property(n => n.Message).HasMaxLength(2000).IsRequired();
+            b.HasIndex(n => new { n.RecipientId, n.RecipientActorType, n.CreatedAt });
+        });
+
+        modelBuilder.Entity<RevokedToken>(b =>
+        {
+            b.Property(t => t.Jti).HasMaxLength(100).IsRequired();
+            b.HasIndex(t => t.Jti).IsUnique();
         });
 
         // Decimal column types

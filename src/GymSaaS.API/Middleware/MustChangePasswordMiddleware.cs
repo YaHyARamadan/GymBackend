@@ -21,7 +21,9 @@ public class MustChangePasswordMiddleware
             {
                 var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
                 // Allow change-password and logout endpoints
-                if (!path.Contains("/change-password") && !path.Contains("/logout"))
+                if (!path.Contains("/change-password") &&
+                    !path.Contains("/logout") &&
+                    !path.Contains("/auth/me"))
                 {
                     context.Response.StatusCode = 403;
                     context.Response.ContentType = "application/json";

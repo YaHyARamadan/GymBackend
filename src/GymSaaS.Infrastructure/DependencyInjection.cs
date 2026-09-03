@@ -110,6 +110,20 @@ public static class DependencyInjection
 
                 OnTokenValidated = async context =>
                 {
+                    var jti = context.Principal?.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)
+                        ?? context.Principal?.FindFirstValue("jti");
+                    if (!string.IsNullOrWhiteSpace(jti))
+                    {
+                        var revokedDb = context.HttpContext.RequestServices.GetRequiredService<DbContext>();
+                        var isRevoked = await revokedDb.Set<GymSaaS.Domain.Entities.RevokedToken>()
+                            .AnyAsync(t => t.Jti == jti && t.ExpiresAt > DateTime.UtcNow);
+                        if (isRevoked)
+                        {
+                            context.Fail("Token has been revoked.");
+                            return;
+                        }
+                    }
+
                     var actorType = context.Principal?.FindFirstValue("actor_type");
                     if (actorType != nameof(ActorType.Supervisor))
                         return;

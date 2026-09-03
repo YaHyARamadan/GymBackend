@@ -164,6 +164,25 @@
 
 ---
 
+#### `GET /api/auth/me`
+Returns the authenticated session context used by the Frontend after login or page refresh.
+
+- Headers: Authorization: Bearer <Token>
+- Response:
+{
+  "success": true,
+  "data": {
+    "userId": "1",
+    "email": "owner@facility.com",
+    "actorType": "Owner",
+    "facilityId": 1,
+    "branchId": null,
+    "isImpersonating": false,
+    "onBehalfOfRole": null,
+    "mustChangePassword": false
+  }
+}
+
 #### `POST /api/auth/login/owner`
 تسجيل دخول الأونر.
 
@@ -556,3 +575,58 @@
 }
 ```
 ⚠️ لو اتفتحت أثناء سيشن impersonation، `senderActorType` بيسجل **الدور الحقيقي المُمثَّل** (Owner/BranchManager/إلخ)، مش `Supervisor` دايمًا.
+
+---
+
+## 5. Frontend Read Endpoints
+
+These endpoints are available in addition to the original command endpoints.
+
+| Method | Route | Access | Purpose |
+|--------|-------|--------|---------|
+| GET | /api/facilities | Supervisor | List all facilities |
+| GET | /api/facilities/{id} | Supervisor | Read one facility |
+| GET | /api/facilities/{id}/branches | Supervisor | Read branches for a facility |
+| GET | /api/facilities/{id}/subscription | Supervisor | Read platform subscription |
+| GET | /api/branches | Facility session | Read branches in the current tenant |
+| GET | /api/players | Facility session | Read players in the current tenant |
+| GET | /api/owners/me | Owner | Read owner and facility onboarding state |
+| GET | /api/addons | Supervisor | Read add-on pricing plans |
+| GET | /api/addons/facility/{facilityId} | Supervisor | Read activated add-ons for a facility |
+| GET | /api/support/tickets | Owner or Supervisor | Read support tickets and messages |
+
+All responses use the standard { "success": true, "data": ... } envelope. Facility-scoped reads derive the facility from the token; supervisor-only facility routes take the id as a route parameter.
+
+    
+## 6. Supervisor Management Endpoints
+
+All endpoints below require a normal Supervisor JWT unless explicitly stated otherwise.
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | /api/auth/login/staff | Login for BranchManager, Coach, or Receptionist |
+| POST | /api/auth/logout | Revoke the current JWT server-side |
+| GET | /api/dashboard/supervisor-overview | Platform counts, revenue, tickets, and unread notifications |
+| PUT | /api/facilities/{id} | Update facility details and license |
+| DELETE | /api/facilities/{id} | Permanently delete facility tenant data while preserving audit history |
+| GET | /api/owners | List owners, optionally filtered by facilityId |
+| PATCH | /api/owners/{id} | Update owner profile and access flags |
+| POST | /api/owners/{id}/reset-password | Reset an owner password |
+| GET | /api/employees | List staff, optionally filtered by facilityId |
+| POST | /api/employees | Create BranchManager, Coach, or Receptionist |
+| PATCH | /api/employees/{role}/{id}/status | Activate or deactivate staff |
+| POST | /api/employees/{role}/{id}/reset-password | Reset staff password |
+| GET | /api/facilities/{id}/players | List all players in a facility |
+| POST | /api/facilities/{id}/players | Create a player in a facility |
+| PUT | /api/facilities/{id}/players/{playerId} | Update player data or active state |
+| GET | /api/facilities/{id}/subscriptions | List player subscriptions in a facility |
+| POST | /api/facilities/{id}/players/{playerId}/subscription | Assign a subscription to a player |
+| GET | /api/payments/records | Filtered and paginated payment records |
+| GET | /api/payments/report | Grouped payment report by facility and payment type |
+| POST | /api/support/tickets/{id}/messages | Reply to a support ticket |
+| POST | /api/support/tickets/{id}/close | Close a support ticket |
+| GET | /api/notifications | Read notifications for the current actor |
+| POST | /api/notifications/{id}/read | Mark one notification as read |
+| POST | /api/notifications/read-all | Mark all notifications as read |
+
+Deleting a facility removes its tenant records, staff, players, subscriptions, payments, tickets, and add-on subscriptions. Audit log rows are intentionally retained.

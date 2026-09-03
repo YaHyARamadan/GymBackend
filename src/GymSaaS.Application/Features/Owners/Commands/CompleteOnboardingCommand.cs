@@ -50,6 +50,9 @@ public class CompleteOnboardingCommandHandler : IRequestHandler<CompleteOnboardi
         if (owner == null)
             throw new NotFoundException("Owner", ownerId);
 
+        if (owner.OnboardingCompleted)
+            return true;
+
         if (!owner.ContractSigned)
             throw new ForbiddenAccessException("يجب التوقيع على العقد الإلكتروني أولاً قبل إكمال التهيئة.");
 

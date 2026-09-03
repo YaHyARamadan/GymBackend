@@ -5,6 +5,10 @@ namespace GymSaaS.Application.Common.Interfaces;
 public interface ICurrentUserService
 {
     string? UserId { get; }
+    string? Email { get; }
+    string? TokenId { get; }
+    DateTime? TokenExpiresAt { get; }
+    bool MustChangePassword { get; }
     ActorType? ActorType { get; }
     int? FacilityId { get; }
     int? BranchId { get; }

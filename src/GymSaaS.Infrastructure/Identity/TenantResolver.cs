@@ -19,6 +19,26 @@ public class TenantResolver : ITenantResolver, ICurrentUserService
 
     public string? ActorId => UserId;
 
+    public string? Email => _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
+
+    public string? TokenId => _httpContextAccessor.HttpContext?.User.FindFirstValue("jti");
+
+    public DateTime? TokenExpiresAt
+    {
+        get
+        {
+            var value = _httpContextAccessor.HttpContext?.User.FindFirstValue("exp");
+            return long.TryParse(value, out var seconds)
+                ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime
+                : null;
+        }
+    }
+
+    public bool MustChangePassword =>
+        bool.TryParse(
+            _httpContextAccessor.HttpContext?.User.FindFirstValue("must_change_password"),
+            out var mustChange) && mustChange;
+
     public ActorType? ActorType
     {
         get

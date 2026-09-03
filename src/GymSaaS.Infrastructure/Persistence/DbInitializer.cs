@@ -9,18 +9,36 @@ public static class DbInitializer
     public static async Task SeedAsync(GymSaaSDbContext dbContext)
     {
         // 1. Seed Default Supervisor if not present
-        if (!await dbContext.Supervisors.AnyAsync())
+        var supervisor = await dbContext.Supervisors.FirstOrDefaultAsync();
+        if (supervisor == null)
         {
-            var supervisor = new Supervisor
+            supervisor = new Supervisor
             {
                 Email = "admin@gymsaas.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-                MustChangePassword = false,
+                MustChangePassword = true,
                 TotpEnabled = false,
                 TokenVersion = 1,
                 CreatedAt = DateTime.UtcNow
             };
             await dbContext.Supervisors.AddAsync(supervisor);
+            await dbContext.SaveChangesAsync();
+        }
+        else if (BCrypt.Net.BCrypt.Verify("Admin123!", supervisor.PasswordHash))
+        {
+            // A fresh bootstrap account must complete the password change flow.
+            // Once the password is replaced this condition stops matching forever.
+            if (!supervisor.MustChangePassword)
+            {
+                supervisor.MustChangePassword = true;
+                await dbContext.SaveChangesAsync();
+            }
+        }
+        else if (supervisor.MustChangePassword)
+        {
+            // Repair databases created from the old seed where the flag stayed true
+            // after the bootstrap password had already been replaced.
+            supervisor.MustChangePassword = false;
             await dbContext.SaveChangesAsync();
         }
 

@@ -77,14 +77,20 @@ public class LoginSupervisorCommandHandler : IRequestHandler<LoginSupervisorComm
         supervisor.LockoutUntil = null;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // Treat the bootstrap password as the only password that requires a first-login change.
+        // This also repairs old databases where MustChangePassword remained true after a change.
+        var mustChangePassword =
+            supervisor.MustChangePassword &&
+            BCrypt.Net.BCrypt.Verify("Admin123!", supervisor.PasswordHash);
+
         if (!supervisor.TotpEnabled)
         {
             var (secret, qrUri) = _totpService.GenerateSetupSecret(supervisor.Email);
             var tempToken = _totpSetupTokenService.GenerateSetupToken(supervisor.Id, secret, TimeSpan.FromMinutes(5));
-            return new LoginSupervisorResponseDto(null, true, false, qrUri, tempToken, supervisor.MustChangePassword);
+            return new LoginSupervisorResponseDto(null, true, false, qrUri, tempToken, mustChangePassword);
         }
 
         var verificationToken = _totpSetupTokenService.GenerateSetupToken(supervisor.Id, null, TimeSpan.FromMinutes(5));
-        return new LoginSupervisorResponseDto(null, false, true, null, verificationToken, supervisor.MustChangePassword);
+        return new LoginSupervisorResponseDto(null, false, true, null, verificationToken, mustChangePassword);
     }
 }

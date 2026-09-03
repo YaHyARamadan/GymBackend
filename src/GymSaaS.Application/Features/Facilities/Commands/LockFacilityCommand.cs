@@ -35,6 +35,17 @@ public class LockFacilityCommandHandler : IRequestHandler<LockFacilityCommand, b
             throw new NotFoundException("Facility", request.FacilityId);
 
         facility.Status = FacilityStatus.Frozen;
+        var supervisorId = await _dbContext.Set<Supervisor>()
+            .Select(s => (int?)s.Id).FirstOrDefaultAsync(cancellationToken);
+        if (supervisorId.HasValue)
+            _dbContext.Set<Notification>().Add(new Notification
+            {
+                RecipientId = supervisorId.Value.ToString(),
+                RecipientActorType = ActorType.Supervisor,
+                FacilityId = facility.Id,
+                Title = "Facility locked",
+                Message = $"Facility #{facility.Id} was locked."
+            });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return true;

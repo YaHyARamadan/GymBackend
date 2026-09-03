@@ -3,6 +3,7 @@ using GymSaaS.Application.Common.Interfaces;
 using GymSaaS.Domain.Entities;
 using GymSaaS.Domain.Enums;
 using GymSaaS.Domain.Exceptions;
+using ValidationException = GymSaaS.Domain.Exceptions.ValidationException;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,6 +53,12 @@ public class ActivateFacilityAddOnCommandHandler : IRequestHandler<ActivateFacil
 
         if (addOn == null)
             throw new NotFoundException("AddOnFeature", request.AddOnFeatureId);
+
+        if (!addOn.IsActiveForSale)
+            throw new ConflictException("This add-on is not available for sale.");
+
+        if (request.AmountPaid != addOn.Price)
+            throw new ValidationException("AmountPaid", "Amount paid must match the add-on price.");
 
         var duplicatePayment = await _dbContext.Set<PaymentRecord>()
             .AnyAsync(p => p.IdempotencyKey == request.IdempotencyKey, cancellationToken);
@@ -109,6 +116,21 @@ public class ActivateFacilityAddOnCommandHandler : IRequestHandler<ActivateFacil
                 return true;
             }
             throw;
+        }
+
+        var supervisorId = await _dbContext.Set<Supervisor>()
+            .Select(s => (int?)s.Id).FirstOrDefaultAsync(cancellationToken);
+        if (supervisorId.HasValue)
+        {
+            _dbContext.Set<Notification>().Add(new Notification
+            {
+                RecipientId = supervisorId.Value.ToString(),
+                RecipientActorType = ActorType.Supervisor,
+                FacilityId = facility.Id,
+                Title = "Add-on activated",
+                Message = $"Add-on {addOn.Name} was activated for facility #{facility.Id}."
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return true;
