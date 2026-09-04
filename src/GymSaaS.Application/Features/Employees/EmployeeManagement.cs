@@ -13,6 +13,11 @@ public record CreateEmployeeCommand(
     ActorType Role, int FacilityId, string Name, string Email, string Password,
     string? Phone, int? BranchId, IReadOnlyList<int>? BranchIds, string? Specialization) : IRequest<EmployeeReadDto>;
 
+public record UpdateEmployeeCommand(
+    ActorType Role, int Id, string Name, string Email,
+    string? Phone, int? BranchId, IReadOnlyList<int>? BranchIds,
+    string? Specialization) : IRequest<EmployeeReadDto>;
+
 public record EmployeeReadDto(
     int Id, ActorType Role, int FacilityId, string Name, string Email, string? Phone,
     int? BranchId, IReadOnlyList<int> BranchIds, string? Specialization, bool IsActive, DateTime CreatedAt);
@@ -126,6 +131,97 @@ public class CreateEmployeeCommandHandler : IRequestHandler<CreateEmployeeComman
     {
         if (!_currentUserService.IsSupervisor)
             throw new ForbiddenAccessException("Only the supervisor can manage employees.");
+    }
+}
+
+public class UpdateEmployeeCommandValidator : AbstractValidator<UpdateEmployeeCommand>
+{
+    public UpdateEmployeeCommandValidator()
+    {
+        RuleFor(x => x.Role).Must(role => role is ActorType.BranchManager or ActorType.Coach or ActorType.Receptionist);
+        RuleFor(x => x.Id).GreaterThan(0);
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.BranchId).GreaterThan(0)
+            .When(x => x.Role is ActorType.Coach or ActorType.Receptionist);
+    }
+}
+
+public class UpdateEmployeeCommandHandler : IRequestHandler<UpdateEmployeeCommand, EmployeeReadDto>
+{
+    private readonly DbContext _dbContext;
+    private readonly ICurrentUserService _currentUserService;
+
+    public UpdateEmployeeCommandHandler(DbContext dbContext, ICurrentUserService currentUserService)
+    {
+        _dbContext = dbContext;
+        _currentUserService = currentUserService;
+    }
+
+    public async Task<EmployeeReadDto> Handle(UpdateEmployeeCommand request, CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.IsSupervisor)
+            throw new ForbiddenAccessException("Only the supervisor can edit employees.");
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var duplicate =
+            await _dbContext.Set<Owner>().IgnoreQueryFilters().AnyAsync(x => x.Email == email, cancellationToken) ||
+            await _dbContext.Set<BranchManager>().IgnoreQueryFilters().AnyAsync(x => x.Email == email && !(request.Role == ActorType.BranchManager && x.Id == request.Id), cancellationToken) ||
+            await _dbContext.Set<Coach>().IgnoreQueryFilters().AnyAsync(x => x.Email == email && !(request.Role == ActorType.Coach && x.Id == request.Id), cancellationToken) ||
+            await _dbContext.Set<Receptionist>().IgnoreQueryFilters().AnyAsync(x => x.Email == email && !(request.Role == ActorType.Receptionist && x.Id == request.Id), cancellationToken) ||
+            await _dbContext.Set<Supervisor>().AnyAsync(x => x.Email == email, cancellationToken);
+        if (duplicate)
+            throw new ConflictException("An account with this email already exists.");
+
+        switch (request.Role)
+        {
+            case ActorType.BranchManager:
+            {
+                var employee = await _dbContext.Set<BranchManager>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
+                    ?? throw new NotFoundException("Employee", request.Id);
+                var branchIds = await ValidateBranches(employee.FacilityId, request.BranchIds, request.BranchId, cancellationToken);
+                employee.Name = request.Name.Trim(); employee.Email = email; employee.Phone = request.Phone?.Trim();
+                employee.AssignedBranchIds = string.Join(",", branchIds);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return new EmployeeReadDto(employee.Id, request.Role, employee.FacilityId, employee.Name, employee.Email, employee.Phone, null, branchIds, null, employee.IsActive, employee.CreatedAt);
+            }
+            case ActorType.Coach:
+            {
+                var employee = await _dbContext.Set<Coach>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
+                    ?? throw new NotFoundException("Employee", request.Id);
+                var branchIds = await ValidateBranches(employee.FacilityId, request.BranchIds, request.BranchId, cancellationToken);
+                employee.Name = request.Name.Trim(); employee.Email = email; employee.Phone = request.Phone?.Trim();
+                employee.BranchId = branchIds[0]; employee.Specialization = request.Specialization?.Trim();
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return new EmployeeReadDto(employee.Id, request.Role, employee.FacilityId, employee.Name, employee.Email, employee.Phone, employee.BranchId, branchIds, employee.Specialization, employee.IsActive, employee.CreatedAt);
+            }
+            case ActorType.Receptionist:
+            {
+                var employee = await _dbContext.Set<Receptionist>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
+                    ?? throw new NotFoundException("Employee", request.Id);
+                var branchIds = await ValidateBranches(employee.FacilityId, request.BranchIds, request.BranchId, cancellationToken);
+                employee.Name = request.Name.Trim(); employee.Email = email; employee.Phone = request.Phone?.Trim();
+                employee.BranchId = branchIds[0];
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return new EmployeeReadDto(employee.Id, request.Role, employee.FacilityId, employee.Name, employee.Email, employee.Phone, employee.BranchId, branchIds, null, employee.IsActive, employee.CreatedAt);
+            }
+            default:
+                throw new ValidationException("Role", "Invalid employee role.");
+        }
+    }
+
+    private async Task<int[]> ValidateBranches(int facilityId, IReadOnlyList<int>? requestedBranchIds, int? branchId, CancellationToken cancellationToken)
+    {
+        var ids = requestedBranchIds?.Distinct().ToArray() ?? [];
+        if (ids.Length == 0 && branchId.HasValue) ids = [branchId.Value];
+        if (ids.Length == 0) throw new ValidationException("BranchIds", "At least one assigned branch is required.");
+        var valid = await _dbContext.Set<Branch>().IgnoreQueryFilters()
+            .Where(x => x.FacilityId == facilityId && ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(cancellationToken);
+        if (valid.Count != ids.Length) throw new NotFoundException("Branch", ids[0]);
+        return ids;
     }
 }
 

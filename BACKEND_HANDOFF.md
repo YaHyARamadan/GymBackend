@@ -304,6 +304,7 @@ Supervisor owner management can update:
 - GET /api/employees
 - GET /api/employees?facilityId={id}
 - POST /api/employees
+- PATCH /api/employees/{role}/{id}
 - PATCH /api/employees/{role}/{id}/status
 - POST /api/employees/{role}/{id}/reset-password
 
@@ -514,3 +515,11 @@ Verified after the latest Docker rebuild:
 - The supervisor impersonation token selects a role and facility but does not identify a real target employee.
 - The player subscription model currently represents created assignment records; a separate reusable plan catalog may be needed later.
 - EF reports warnings about required entities with global query filters for ContractApproval and SupportTicketMessage. The application starts and migrations apply, but these relationships should be made optional or given matching filters before a production hard-delete/soft-delete policy is finalized.
+
+## 14. Latest Supervisor Update (2026-09-03)
+
+- Added `PATCH /api/employees/{role}/{id}` for supervisor-only employee profile updates.
+- The update supports name, email, phone, branch assignments, and coach specialization without changing the employee role or facility.
+- The handler validates email uniqueness, employee existence, assigned branch ownership, and allowed employee roles.
+- Backend verification: `dotnet build --no-restore` passed with 0 errors and 0 warnings; `dotnet test --no-restore` passed 37 tests in 3 projects.
+- TOTP reset/disable management remains intentionally unimplemented until a secure re-enrollment flow is agreed. Existing mandatory setup and verification continue to work.

@@ -29,6 +29,18 @@ public class EmployeesController : ControllerBase
         return Ok(new { success = true, data = result });
     }
 
+    [HttpPatch("{role}/{id:int}")]
+    public async Task<IActionResult> UpdateEmployee(string role, int id, [FromBody] UpdateEmployeeRequest request)
+    {
+        if (!Enum.TryParse<ActorType>(role, true, out var actorType))
+            return BadRequest(new { success = false, message = "Invalid employee role." });
+
+        var result = await _mediator.Send(new UpdateEmployeeCommand(
+            actorType, id, request.Name, request.Email, request.Phone,
+            request.BranchId, request.BranchIds, request.Specialization));
+        return Ok(new { success = true, data = result });
+    }
+
     [HttpPatch("{role}/{id:int}/status")]
     public async Task<IActionResult> SetStatus(string role, int id, [FromBody] EmployeeStatusRequest request)
     {
@@ -52,3 +64,4 @@ public class EmployeesController : ControllerBase
 
 public record EmployeeStatusRequest(bool IsActive);
 public record ResetEmployeePasswordRequest(string NewPassword);
+public record UpdateEmployeeRequest(string Name, string Email, string? Phone, int? BranchId, IReadOnlyList<int>? BranchIds, string? Specialization);

@@ -614,6 +614,7 @@ All endpoints below require a normal Supervisor JWT unless explicitly stated oth
 | POST | /api/owners/{id}/reset-password | Reset an owner password |
 | GET | /api/employees | List staff, optionally filtered by facilityId |
 | POST | /api/employees | Create BranchManager, Coach, or Receptionist |
+| PATCH | /api/employees/{role}/{id} | Update staff profile, email, phone, branch assignments, and coach specialization |
 | PATCH | /api/employees/{role}/{id}/status | Activate or deactivate staff |
 | POST | /api/employees/{role}/{id}/reset-password | Reset staff password |
 | GET | /api/facilities/{id}/players | List all players in a facility |
